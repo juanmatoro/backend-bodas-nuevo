@@ -25,6 +25,9 @@ app.use("/api/users", userRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/photos", photoRoutes);
 
+app.get("/api/test", (req, res) => {
+  res.json({ success: true, message: "🚀 Conexión con el backend exitosa!" });
+});
 // Middleware de manejo de errores
 app.use(errorMiddleware);
 

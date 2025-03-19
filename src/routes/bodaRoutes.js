@@ -13,7 +13,11 @@ const router = express.Router();
 router.get("/", authMiddleware(["admin"]), obtenerBodas); // Solo admin puede ver todas
 router.get("/:id", authMiddleware(["admin", "novio", "novia"]), obtenerBoda); // Novios solo ven su boda
 router.post("/", authMiddleware(["admin"]), crearBoda);
-router.put("/:id", authMiddleware(["admin"]), actualizarBoda);
+router.put(
+  "/:id",
+  authMiddleware(["admin", , "novio", "novia"]),
+  actualizarBoda
+);
 router.delete("/:id", authMiddleware(["admin"]), eliminarBoda);
 
 module.exports = router;
