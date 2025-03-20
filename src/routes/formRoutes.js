@@ -14,6 +14,11 @@ router.get(
   authMiddleware(["admin", "novio", "novia"]),
   formController.getQuestionsByBoda
 );
+router.get(
+  "/question/:id",
+  authMiddleware(["admin", "novio", "novia"]),
+  formController.getQuestionById
+);
 router.put(
   "/questions/:id",
   authMiddleware(["admin", "novio", "novia"]),
