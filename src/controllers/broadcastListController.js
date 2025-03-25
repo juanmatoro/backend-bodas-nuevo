@@ -6,12 +6,22 @@ exports.crearListaDifusion = async (req, res) => {
   try {
     const { nombre, invitados } = req.body;
 
-    // Verificar permisos (solo novios pueden crear listas)
-    if (!["novio", "novia"].includes(req.user.tipoUsuario)) {
+    if (!["novio", "novia", "admin"].includes(req.user.tipoUsuario)) {
       return res.status(403).json({ message: "Acceso denegado" });
     }
 
-    // Crear lista de difusión
+    // Verificar si ya existe una lista con ese nombre en la misma boda
+    const existeLista = await BroadcastList.findOne({
+      bodaId: req.user.bodaId,
+      nombre,
+    });
+
+    if (existeLista) {
+      return res
+        .status(400)
+        .json({ message: "Ya existe una lista con este nombre" });
+    }
+
     const nuevaLista = new BroadcastList({
       nombre,
       invitados,
@@ -19,12 +29,10 @@ exports.crearListaDifusion = async (req, res) => {
     });
 
     await nuevaLista.save();
-    res
-      .status(201)
-      .json({
-        message: "Lista de difusión creada exitosamente",
-        lista: nuevaLista,
-      });
+    res.status(201).json({
+      message: "Lista de difusión creada exitosamente",
+      lista: nuevaLista,
+    });
   } catch (error) {
     console.error("❌ Error en crearListaDifusion:", error);
     res.status(500).json({ message: "Error al crear la lista de difusión" });
@@ -34,12 +42,14 @@ exports.crearListaDifusion = async (req, res) => {
 // 📌 Obtener todas las listas de difusión de una boda
 exports.obtenerListasDifusion = async (req, res) => {
   try {
-    // Verificar permisos
     if (!["novio", "novia"].includes(req.user.tipoUsuario)) {
       return res.status(403).json({ message: "Acceso denegado" });
     }
 
-    const listas = await BroadcastList.find({ bodaId: req.user.bodaId });
+    const listas = await BroadcastList.find({
+      bodaId: req.user.bodaId,
+    }).populate("invitados", "nombre telefono"); // ✅ Poblar detalles de los invitados
+
     res.json(listas);
   } catch (error) {
     console.error("❌ Error en obtenerListasDifusion:", error);
@@ -110,18 +120,23 @@ exports.eliminarInvitadoDeLista = async (req, res) => {
 // 📌 Eliminar una lista de difusión
 exports.eliminarListaDifusion = async (req, res) => {
   try {
-    const { listaId } = req.params;
+    const { id } = req.params; // Asegurarse de que se extrae bien el ID de la URL
+    const userBodaId = req.user.bodaId;
 
-    // Verificar permisos
-    if (!["novio", "novia"].includes(req.user.tipoUsuario)) {
-      return res.status(403).json({ message: "Acceso denegado" });
-    }
+    // Buscar la lista en la base de datos
+    const lista = await BroadcastList.findById(id);
 
-    const lista = await BroadcastList.findById(listaId);
-    if (!lista || lista.bodaId.toString() !== req.user.bodaId.toString()) {
+    if (!lista) {
       return res
         .status(404)
-        .json({ message: "Lista no encontrada o no pertenece a tu boda" });
+        .json({ message: "Lista de difusión no encontrada" });
+    }
+
+    // Verificar que la lista pertenece a la misma boda que el usuario
+    if (lista.bodaId.toString() !== userBodaId.toString()) {
+      return res
+        .status(403)
+        .json({ message: "No tienes permisos para eliminar esta lista" });
     }
 
     await lista.deleteOne();
@@ -129,5 +144,42 @@ exports.eliminarListaDifusion = async (req, res) => {
   } catch (error) {
     console.error("❌ Error en eliminarListaDifusion:", error);
     res.status(500).json({ message: "Error al eliminar la lista" });
+  }
+};
+
+// 📌 Editar una lista de difusión
+exports.editarListaDifusion = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, invitados } = req.body;
+    const userBodaId = req.user.bodaId;
+
+    // Buscar la lista en la base de datos
+    const lista = await BroadcastList.findById(id);
+
+    if (!lista) {
+      return res
+        .status(404)
+        .json({ message: "Lista de difusión no encontrada" });
+    }
+
+    // Verificar que la lista pertenece a la boda del usuario
+    if (lista.bodaId.toString() !== userBodaId.toString()) {
+      return res
+        .status(403)
+        .json({ message: "No tienes permisos para editar esta lista" });
+    }
+
+    // Actualizar datos
+    lista.nombre = nombre || lista.nombre;
+    if (Array.isArray(invitados)) {
+      lista.invitados = invitados;
+    }
+
+    await lista.save();
+    res.json({ message: "Lista actualizada correctamente", lista });
+  } catch (error) {
+    console.error("❌ Error en editarListaDifusion:", error);
+    res.status(500).json({ message: "Error al editar la lista" });
   }
 };

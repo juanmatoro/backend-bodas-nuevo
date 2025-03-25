@@ -33,16 +33,6 @@ exports.obtenerInvitados = async (req, res) => {
   }
 };
 
-/* exports.obtenerInvitados = async (req, res) => {
-  try {
-    const invitados = await Guest.find({ bodaId: req.user.bodaId });
-    res.json(invitados);
-  } catch (error) {
-    console.error("❌ Error en obtenerInvitados:", error);
-    res.status(500).json({ message: "Error al obtener invitados" });
-  }
-}; */
-
 // 📌 Obtener un invitado por ID
 exports.obtenerInvitado = async (req, res) => {
   try {
@@ -59,14 +49,7 @@ exports.obtenerInvitado = async (req, res) => {
     res.status(500).json({ message: "Error al obtener invitado" });
   }
 };
-// Función para normalizar textos (sin acentos, minúsculas)
-/* const normalizeText = (text) => {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
-}; */
+
 // 📌 Crear invitado (solo novios/admin)
 exports.crearInvitado = async (req, res) => {
   try {
@@ -114,6 +97,7 @@ exports.crearInvitado = async (req, res) => {
     res.status(500).json({ message: "Error al crear invitado" });
   }
 };
+
 // 📌 Actualizar invitado (solo novios/admin)
 exports.actualizarInvitado = async (req, res) => {
   try {

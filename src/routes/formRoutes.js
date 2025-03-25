@@ -32,10 +32,11 @@ router.delete(
 
 // 📌 CRUD de Formularios (Solo Admin o Novios pueden crearlos)
 router.post(
-  "/forms",
+  "/form",
   authMiddleware(["admin", "novio", "novia"]),
   formController.createForm
 );
+
 router.get(
   "/forms/:bodaId",
   authMiddleware(["admin", "novio", "novia"]),
@@ -47,6 +48,17 @@ router.get(
   formController.getFormById
 );
 
+router.delete(
+  "/form/:id",
+  authMiddleware(["admin", "novio", "novia"]),
+  formController.deleteForm
+);
+
+router.put(
+  "/form/:id",
+  authMiddleware(["admin", "novio", "novia"]),
+  formController.updateForm
+);
 // 📌 Guardar respuesta de un invitado (Solo Invitados)
 router.post(
   "/responses",

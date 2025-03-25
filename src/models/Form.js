@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 // 📌 Modelo de Preguntas
 const questionSchema = new mongoose.Schema({
@@ -9,10 +9,12 @@ const questionSchema = new mongoose.Schema({
     index: true,
   },
   pregunta: { type: String, required: true },
-  opciones: [{ type: String, required: true }], // ✅ Opciones obligatorias (mínimo 2 respuestas)
+  opciones: [{ type: String, required: true }],
   esObligatoria: { type: Boolean, default: false },
-});
 
+  // 🆕 Campo para marcar preguntas de confirmación
+  esConfirmacionAsistencia: { type: Boolean, default: false },
+});
 const Question = mongoose.model("Question", questionSchema);
 
 // 📌 Modelo de Respuestas de Invitados
@@ -34,6 +36,7 @@ const Response = mongoose.model("Response", responseSchema);
 
 // 📌 Modelo de Formularios
 const formSchema = new mongoose.Schema({
+  nombre: { type: String, required: true }, // ✅ Se agregó el campo nombre al formulario
   bodaId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Boda",
@@ -57,4 +60,4 @@ const formSchema = new mongoose.Schema({
 
 const Form = mongoose.model("Form", formSchema);
 
-export { Question, Response, Form };
+module.exports = { Question, Response, Form }; // ✅ Exportado en CommonJS
