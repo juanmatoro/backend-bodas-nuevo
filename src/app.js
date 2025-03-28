@@ -8,15 +8,20 @@ const bodaRoutes = require("./routes/bodaRoutes");
 const broadcastRoutes = require("./routes/broadcastRoutes");
 const guestRoutes = require("./routes/guestRoutes");
 const userRoutes = require("./routes/userRoutes");
-const formRoutes = require("./routes/formRoutes");
 const statsRoutes = require("./routes/statsRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const photoRoutes = require("./routes/photoRoutes");
+const preguntaRoutes = require("./routes/preguntas");
 
 const app = express();
 
 // Middlewares globales
-app.use(cors());
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL, // frontend URL
+    credentials: true, // si usas cookies o sesiones
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -27,8 +32,8 @@ app.use("/api/guests", guestRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/lists", broadcastRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/preguntas", preguntaRoutes);
 app.use("/api/photos", photoRoutes);
-app.use("/api/forms", formRoutes);
 app.use("/api/estadisticas", statsRoutes);
 
 app.get("/api/test", (req, res) => {

@@ -183,3 +183,18 @@ exports.editarListaDifusion = async (req, res) => {
     res.status(500).json({ message: "Error al editar la lista" });
   }
 };
+// 📌 Obtener listas en las que está un invitado
+exports.obtenerListasPorInvitado = async (req, res) => {
+  try {
+    const { invitadoId } = req.params;
+
+    const listas = await BroadcastList.find({ invitados: invitadoId }).select(
+      "nombre"
+    );
+
+    res.status(200).json(listas);
+  } catch (error) {
+    console.error("❌ Error al obtener listas por invitado:", error);
+    res.status(500).json({ message: "Error al obtener listas" });
+  }
+};

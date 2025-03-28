@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const formController = require("../controllers/formController");
-const authMiddleware = require("../middlewares/authMiddleware");
+const authMiddleware = require("../../middlewares/authMiddleware");
 
 // 📌 CRUD de Preguntas (Solo Admin o Novios)
 router.post(

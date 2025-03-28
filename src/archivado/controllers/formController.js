@@ -1,4 +1,4 @@
-const { Guest } = require("../models/Guest.js");
+const { Guest } = require("../../models/Guest.js");
 const { Question, Response, Form } = require("../models/Form.js");
 
 // 📌 Crear una nueva pregunta personalizada

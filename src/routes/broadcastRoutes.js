@@ -6,6 +6,7 @@ const {
   agregarInvitadosALista,
   eliminarInvitadoDeLista,
   editarListaDifusion,
+  obtenerListasPorInvitado,
 } = require("../controllers/broadcastListController");
 const authMiddleware = require("../middlewares/authMiddleware");
 
@@ -43,6 +44,12 @@ router.put(
   "/:id",
   authMiddleware(["novio", "novia", "admin"]),
   editarListaDifusion
+);
+
+router.get(
+  "/por-invitado/:invitadoId",
+  authMiddleware(["novio", "novia", "admin"]),
+  obtenerListasPorInvitado
 );
 
 module.exports = router;

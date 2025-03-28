@@ -8,6 +8,8 @@ const {
   eliminarInvitado,
   reenviarEnlace,
   cargarInvitadosDesdeExcel,
+  asignarPreguntaAInvitados,
+  filtrarInvitadosPorRespuesta,
 } = require("../controllers/guestController");
 const authMiddleware = require("../middlewares/authMiddleware");
 
@@ -25,9 +27,9 @@ router.get(
   obtenerInvitado
 );
 router.post("/", authMiddleware(["admin", "novio", "novia"]), crearInvitado);
-router.put(
+router.patch(
   "/:id",
-  authMiddleware(["admin", "novio", "novia"]),
+  authMiddleware(["admin", "novio", "novia", "guest"]),
   actualizarInvitado
 );
 router.delete(
@@ -46,6 +48,18 @@ router.post(
   authMiddleware(["admin", "novio", "novia"]),
   upload.single("archivo"),
   cargarInvitadosDesdeExcel
+);
+
+router.post(
+  "/asignar-pregunta",
+  authMiddleware(["admin", "novio", "novia"]),
+  asignarPreguntaAInvitados
+);
+
+router.post(
+  "/filtrar-por-respuesta",
+  authMiddleware(["admin", "novio", "novia"]),
+  filtrarInvitadosPorRespuesta
 );
 
 module.exports = router;

@@ -99,7 +99,7 @@ exports.crearInvitado = async (req, res) => {
 };
 
 // 📌 Actualizar invitado (solo novios/admin)
-exports.actualizarInvitado = async (req, res) => {
+/* exports.actualizarInvitado = async (req, res) => {
   try {
     const invitado = await Guest.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
@@ -109,7 +109,40 @@ exports.actualizarInvitado = async (req, res) => {
     console.error("❌ Error en actualizarInvitado:", error);
     res.status(500).json({ message: "Error al actualizar invitado" });
   }
+}; */
+// 📌 Actualizar invitado (invitado solo puede editarse a sí mismo)
+exports.actualizarInvitado = async (req, res) => {
+  try {
+    const user = req.user; // Obtenido desde el middleware por token
+    const idDelInvitadoAEditar = req.params.id;
+
+    // Si el usuario es un invitado (guest)
+    if (user.role === "guest") {
+      if (user._id !== idDelInvitadoAEditar) {
+        return res.status(403).json({
+          message: "No tienes permiso para editar este invitado.",
+        });
+      }
+    }
+
+    // Admins y novios pueden editar cualquier invitado
+    const invitadoActualizado = await Guest.findByIdAndUpdate(
+      idDelInvitadoAEditar,
+      req.body,
+      { new: true }
+    );
+
+    if (!invitadoActualizado) {
+      return res.status(404).json({ message: "Invitado no encontrado." });
+    }
+
+    res.json(invitadoActualizado);
+  } catch (error) {
+    console.error("❌ Error en actualizarInvitado:", error);
+    res.status(500).json({ message: "Error al actualizar invitado" });
+  }
 };
+
 // 📌 Eliminar un invitado
 exports.eliminarInvitado = async (req, res) => {
   try {
@@ -244,5 +277,102 @@ exports.cargarInvitadosDesdeExcel = async (req, res) => {
   } catch (error) {
     console.error("❌ Error en cargarInvitadosDesdeExcel:", error);
     res.status(500).json({ message: "Error al procesar el archivo." });
+  }
+};
+
+// 📌 Asignar pregunta a invitados (por invitado, lista o todos)
+exports.asignarPreguntaAInvitados = async (req, res) => {
+  try {
+    const { preguntaId, tipoAsignacion, listaId, invitadoId } = req.body;
+    const { bodaId } = req.user;
+
+    if (!preguntaId || !tipoAsignacion) {
+      return res.status(400).json({ message: "Faltan datos obligatorios." });
+    }
+
+    const pregunta = await Question.findById(preguntaId);
+    if (!pregunta) {
+      return res.status(404).json({ message: "Pregunta no encontrada." });
+    }
+
+    let invitados = [];
+
+    if (tipoAsignacion === "todos") {
+      invitados = await Guest.find({ bodaId });
+    } else if (tipoAsignacion === "lista") {
+      if (!listaId) return res.status(400).json({ message: "Falta listaId." });
+      const lista = await BroadcastList.findById(listaId).populate("invitados");
+      if (!lista)
+        return res.status(404).json({ message: "Lista no encontrada." });
+      invitados = lista.invitados;
+    } else if (tipoAsignacion === "invitado") {
+      if (!invitadoId)
+        return res.status(400).json({ message: "Falta invitadoId." });
+      const invitado = await Guest.findById(invitadoId);
+      if (!invitado)
+        return res.status(404).json({ message: "Invitado no encontrado." });
+      invitados = [invitado];
+    } else {
+      return res.status(400).json({ message: "Tipo de asignación no válido." });
+    }
+
+    let count = 0;
+    for (const invitado of invitados) {
+      const yaExiste = await Response.findOne({
+        invitadoId: invitado._id,
+        preguntaId,
+      });
+      if (!yaExiste) {
+        await Response.create({
+          invitadoId: invitado._id,
+          preguntaId,
+          respuesta: "",
+        });
+        count++;
+      }
+    }
+
+    res.status(200).json({
+      message: `Pregunta asignada a ${count} invitado(s).`,
+    });
+  } catch (error) {
+    console.error("❌ Error en asignarPreguntaAInvitados:", error);
+    res.status(500).json({ message: "Error interno al asignar pregunta." });
+  }
+};
+
+exports.filtrarInvitadosPorRespuesta = async (req, res) => {
+  try {
+    const { preguntaId, respuesta } = req.body;
+    const { bodaId } = req.user;
+
+    if (!preguntaId || typeof respuesta !== "string") {
+      return res
+        .status(400)
+        .json({ message: "Se requiere preguntaId y respuesta." });
+    }
+
+    // ✅ Obtener las respuestas de esa pregunta con ese valor
+    const respuestas = await Response.find({
+      preguntaId,
+      respuesta,
+    });
+
+    const invitadoIds = respuestas.map((r) => r.invitadoId);
+
+    const invitados = await Guest.find({
+      _id: { $in: invitadoIds },
+      bodaId,
+    });
+
+    res.status(200).json({
+      total: invitados.length,
+      invitados,
+    });
+  } catch (error) {
+    console.error("❌ Error al filtrar invitados:", error);
+    res
+      .status(500)
+      .json({ message: "Error al filtrar invitados por respuesta." });
   }
 };
