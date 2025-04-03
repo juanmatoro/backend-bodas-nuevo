@@ -5,6 +5,8 @@ const Guest = require("../models/Guest");
 exports.crearListaDifusion = async (req, res) => {
   try {
     const { nombre, invitados } = req.body;
+    console.log("📥 Recibido:", { nombre, invitados });
+    console.log("👤 Usuario autenticado:", req.user);
 
     if (!["novio", "novia", "admin"].includes(req.user.tipoUsuario)) {
       return res.status(403).json({ message: "Acceso denegado" });

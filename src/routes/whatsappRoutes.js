@@ -1,17 +1,22 @@
 const express = require("express");
 const {
   startSession,
+  startSessionFromFrontend,
+
   closeSession,
   getSessionStatus,
   sendMessage,
   sendBroadcastMessage,
   scheduleMessage,
-} = require("../controllers/whatsappController");
+} = require("../controllers/watssappController");
 
 const router = express.Router();
 
 // Ruta para iniciar sesión en WhatsApp
 router.post("/start", startSession);
+
+// Ruta para iniciar sesión desde el frontend
+router.post("/start-session", startSessionFromFrontend);
 
 // Ruta para cerrar sesión en WhatsApp
 router.post("/close", closeSession);

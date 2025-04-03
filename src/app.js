@@ -10,6 +10,8 @@ const guestRoutes = require("./routes/guestRoutes");
 const userRoutes = require("./routes/userRoutes");
 const statsRoutes = require("./routes/statsRoutes");
 const messageRoutes = require("./routes/messageRoutes");
+const whatsappRoutes = require("./routes/whatsappRoutes");
+const messageTemplateRoutes = require("./routes/messageTemplateRoutes");
 const photoRoutes = require("./routes/photoRoutes");
 const preguntaRoutes = require("./routes/preguntas");
 
@@ -32,6 +34,8 @@ app.use("/api/guests", guestRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/lists", broadcastRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/whatsapp", whatsappRoutes);
+app.use("/api/plantillas", messageTemplateRoutes);
 app.use("/api/preguntas", preguntaRoutes);
 app.use("/api/photos", photoRoutes);
 app.use("/api/estadisticas", statsRoutes);

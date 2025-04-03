@@ -1,3 +1,4 @@
+// ✅ Nuevo modelo actualizado sin campo 'filtros', con soporte para subpregunta condicional
 const mongoose = require("mongoose");
 
 const questionSchema = new mongoose.Schema(
@@ -12,9 +13,11 @@ const questionSchema = new mongoose.Schema(
     opciones: [{ type: String, required: true }],
     esObligatoria: { type: Boolean, default: false },
     esConfirmacionAsistencia: { type: Boolean, default: false },
-    filtros: {
-      type: Object,
-      default: {},
+
+    // 🆕 Subpregunta condicional
+    subPregunta: {
+      texto: { type: String },
+      opciones: [{ type: String }],
     },
   },
   {

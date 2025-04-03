@@ -1,5 +1,8 @@
 const { mongo } = require("mongoose");
 const Guest = require("../models/Guest");
+const Question = require("../models/question");
+const BroadcastList = require("../models/BroadcastList");
+
 const normalizationUtils = require("../utils/normalization");
 const { generateShortId } = require("../utils/shortIdUtils");
 const multer = require("multer");
@@ -34,14 +37,22 @@ exports.obtenerInvitados = async (req, res) => {
 };
 
 // 📌 Obtener un invitado por ID
+
 exports.obtenerInvitado = async (req, res) => {
   try {
-    console.log("🔍 Buscando invitado con ID:", req.params.id); // 👀 Debug
-    const invitado = await Guest.findById(req.params.id); // ✅ findById espera solo el ID
+    console.log("🔍 Buscando invitado con ID:", req.params.id);
+    const invitado = await Guest.findById(req.params.id).lean();
 
     if (!invitado) {
       return res.status(404).json({ message: "Invitado no encontrado" });
     }
+
+    // 🔍 Obtener las preguntas asignadas (usando los IDs de respuestas)
+    const preguntaIds = invitado.respuestas.map((r) => r.preguntaId);
+    const preguntas = await Question.find({ _id: { $in: preguntaIds } });
+
+    // ✅ Inyectar las preguntas asignadas en la respuesta del invitado
+    invitado.preguntasAsignadas = preguntas;
 
     res.json(invitado);
   } catch (error) {
@@ -98,45 +109,57 @@ exports.crearInvitado = async (req, res) => {
   }
 };
 
-// 📌 Actualizar invitado (solo novios/admin)
-/* exports.actualizarInvitado = async (req, res) => {
-  try {
-    const invitado = await Guest.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-    });
-    res.json(invitado);
-  } catch (error) {
-    console.error("❌ Error en actualizarInvitado:", error);
-    res.status(500).json({ message: "Error al actualizar invitado" });
-  }
-}; */
 // 📌 Actualizar invitado (invitado solo puede editarse a sí mismo)
 exports.actualizarInvitado = async (req, res) => {
   try {
-    const user = req.user; // Obtenido desde el middleware por token
+    console.log("📥 Respuestas recibidas en el backend:", req.body.respuestas);
+    console.log("📦 BODY COMPLETO:", req.body);
+    const user = req.user;
     const idDelInvitadoAEditar = req.params.id;
 
-    // Si el usuario es un invitado (guest)
-    if (user.role === "guest") {
-      if (user._id !== idDelInvitadoAEditar) {
-        return res.status(403).json({
-          message: "No tienes permiso para editar este invitado.",
-        });
-      }
+    if (user.role === "guest" && user._id !== idDelInvitadoAEditar) {
+      return res.status(403).json({
+        message: "No tienes permiso para editar este invitado.",
+      });
     }
 
-    // Admins y novios pueden editar cualquier invitado
-    const invitadoActualizado = await Guest.findByIdAndUpdate(
-      idDelInvitadoAEditar,
-      req.body,
-      { new: true }
-    );
-
-    if (!invitadoActualizado) {
+    const invitado = await Guest.findById(idDelInvitadoAEditar);
+    if (!invitado) {
       return res.status(404).json({ message: "Invitado no encontrado." });
     }
 
-    res.json(invitadoActualizado);
+    // 📌 Actualizar respuestas si vienen en el body
+    if (Array.isArray(req.body.respuestas)) {
+      req.body.respuestas.forEach((nueva) => {
+        const idx = invitado.respuestas.findIndex(
+          (r) => r.preguntaId.toString() === nueva.preguntaId
+        );
+
+        if (idx !== -1) {
+          // ✅ Actualizar respuesta existente
+          invitado.respuestas[idx].respuesta = nueva.respuesta;
+          if (nueva.subRespuesta) {
+            invitado.respuestas[idx].subRespuesta = nueva.subRespuesta;
+          }
+        } else {
+          // ➕ Añadir nueva respuesta
+          invitado.respuestas.push({
+            preguntaId: nueva.preguntaId,
+            respuesta: nueva.respuesta,
+            subRespuesta: nueva.subRespuesta || undefined,
+            pregunta: nueva.pregunta || "", // Puedes incluirla si la mandas desde el front
+          });
+        }
+      });
+
+      await invitado.save();
+    } else {
+      // 📌 Actualizar otros datos generales
+      Object.assign(invitado, req.body);
+      await invitado.save();
+    }
+
+    res.json(invitado);
   } catch (error) {
     console.error("❌ Error en actualizarInvitado:", error);
     res.status(500).json({ message: "Error al actualizar invitado" });
@@ -317,17 +340,20 @@ exports.asignarPreguntaAInvitados = async (req, res) => {
     }
 
     let count = 0;
+
     for (const invitado of invitados) {
-      const yaExiste = await Response.findOne({
-        invitadoId: invitado._id,
-        preguntaId,
-      });
-      if (!yaExiste) {
-        await Response.create({
-          invitadoId: invitado._id,
-          preguntaId,
+      const yaTiene = invitado.respuestas.find(
+        (r) => r.preguntaId.toString() === preguntaId
+      );
+
+      if (!yaTiene) {
+        invitado.respuestas.push({
+          preguntaId: pregunta._id,
+          pregunta: pregunta.pregunta,
           respuesta: "",
         });
+
+        await invitado.save();
         count++;
       }
     }
@@ -341,6 +367,66 @@ exports.asignarPreguntaAInvitados = async (req, res) => {
   }
 };
 
+// 📌 Guardar respuestas del invitado
+exports.guardarRespuestas = async (req, res) => {
+  console.log("📥 Respuestas recibidas en el backend:", req.body.respuestas);
+
+  try {
+    const { id } = req.params;
+    const { respuestas } = req.body;
+
+    const invitado = await Guest.findById(id);
+    if (!invitado) {
+      return res.status(404).json({ message: "Invitado no encontrado." });
+    }
+
+    // Actualiza o añade respuestas
+    req.body.respuestas.forEach((nuevaResp) => {
+      const idx = invitado.respuestas.findIndex(
+        (r) => r.preguntaId && r.preguntaId.toString() === nuevaResp.preguntaId
+      );
+
+      if (idx >= 0) {
+        invitado.respuestas[idx].respuesta = nuevaResp.respuesta;
+        if (nuevaResp.subRespuesta) {
+          invitado.respuestas[idx].subRespuesta = nuevaResp.subRespuesta;
+        }
+      } else {
+        invitado.respuestas.push({
+          preguntaId: nuevaResp.preguntaId,
+          pregunta: nuevaResp.pregunta || "",
+          respuesta: nuevaResp.respuesta,
+          subRespuesta: nuevaResp.subRespuesta || "",
+        });
+      }
+    });
+
+    await invitado.save();
+
+    res.status(200).json({ message: "Respuestas guardadas correctamente." });
+  } catch (error) {
+    console.error("❌ Error al guardar respuestas:", error);
+    res.status(500).json({ message: "Error al guardar respuestas." });
+  }
+};
+
+// 📌 Obtener preguntas asignadas a un invitado
+exports.obtenerPreguntasAsignadas = async (req, res) => {
+  try {
+    const invitadoId = req.params.id;
+    const invitado = await Guest.findById(invitadoId);
+
+    if (!invitado) {
+      return res.status(404).json({ message: "Invitado no encontrado" });
+    }
+
+    res.json(invitado.respuestas);
+  } catch (error) {
+    console.error("❌ Error al obtener preguntas asignadas:", error);
+    res.status(500).json({ message: "Error interno al obtener preguntas." });
+  }
+};
+// 📌 Filtrar invitados por respuesta a una pregunta
 exports.filtrarInvitadosPorRespuesta = async (req, res) => {
   try {
     const { preguntaId, respuesta } = req.body;
@@ -352,17 +438,15 @@ exports.filtrarInvitadosPorRespuesta = async (req, res) => {
         .json({ message: "Se requiere preguntaId y respuesta." });
     }
 
-    // ✅ Obtener las respuestas de esa pregunta con ese valor
-    const respuestas = await Response.find({
-      preguntaId,
-      respuesta,
-    });
-
-    const invitadoIds = respuestas.map((r) => r.invitadoId);
-
+    // Filtrar directamente en los documentos de invitados
     const invitados = await Guest.find({
-      _id: { $in: invitadoIds },
       bodaId,
+      respuestas: {
+        $elemMatch: {
+          preguntaId: new mongoose.Types.ObjectId(preguntaId),
+          respuesta: respuesta,
+        },
+      },
     });
 
     res.status(200).json({

@@ -1,207 +1,94 @@
-const venom = require("venom-bot");
-const BroadcastList = require("../models/BroadcastList");
+const { create } = require("venom-bot");
+const path = require("path");
 const Boda = require("../models/Boda");
-const User = require("../models/User");
 
-let sesionesWhatsApp = {}; // 📌 Almacena sesiones activas por `bodaId`
+const sesionesWhatsApp = new Map();
+const estadosSesion = new Map();
 
 const iniciarSesionWhatsApp = async (bodaId) => {
-  if (sesionesWhatsApp[bodaId]) {
-    console.log(`📲 Sesión ya iniciada para la boda ${bodaId}.`);
-    return sesionesWhatsApp[bodaId];
+  if (sesionesWhatsApp.has(bodaId)) {
+    const cliente = sesionesWhatsApp.get(bodaId);
+    const estado = await cliente.getConnectionState?.();
+    if (estado === "CONNECTED") {
+      console.log(`🔄 Sesión ya activa para boda ${bodaId}`);
+      estadosSesion.set(bodaId, "CONNECTED");
+      return cliente;
+    }
   }
 
-  const boda = await Boda.findById(bodaId);
-  if (!boda || !boda.whatsappNumber) {
-    throw new Error(
-      `❌ No se encontró un número de WhatsApp para la boda ${bodaId}`
-    );
-  }
+  console.log(`🚀 Iniciando nueva sesión para boda ${bodaId}`);
+  estadosSesion.set(bodaId, "CONNECTING");
 
-  console.log(
-    `🚀 Iniciando sesión de WhatsApp con el número ${boda.whatsappNumber}...`
-  );
+  const tokenPath = path.join("tokens", `${bodaId}.json`);
 
-  sesionesWhatsApp[bodaId] = await venom.create(
-    `boda-${bodaId}`,
-    (qrCode) => {
-      console.log(`📲 Escanea este código QR en WhatsApp: ${qrCode}`);
-    },
-    async (statusSession) => {
-      console.log(
-        `🟢 Estado de la sesión de la boda ${bodaId}:`,
-        statusSession
-      );
-      if (statusSession === "disconnected" || statusSession === "notLogged") {
-        console.log(`⚠️ Sesión cerrada para la boda ${bodaId}.`);
-        await Boda.findByIdAndUpdate(bodaId, { whatsappSession: null });
-        cerrarWhatsApp(bodaId);
-      } else {
-        await Boda.findByIdAndUpdate(bodaId, {
-          whatsappSession: `boda-${bodaId}`,
-        });
-      }
-    },
-    {
+  try {
+    const client = await create({
+      session: `boda-${bodaId}`,
+      multidevice: true,
       headless: false,
+      folderNameToken: "tokens",
+      browserSessionToken: tokenPath,
+      disableWelcome: true,
       useChrome: true,
-      autoClose: false,
-      disableSpins: true,
-      logQR: true,
+      puppeteerOptions: {
+        headless: false,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-background-timer-throttling",
+          "--disable-renderer-backgrounding",
+          "--disable-backgrounding-occluded-windows",
+          "--window-size=1280,800",
+        ],
+      },
+    });
+
+    sesionesWhatsApp.set(bodaId, client);
+    estadosSesion.set(bodaId, "CONNECTED");
+
+    if (typeof client.onStateChange === "function") {
+      client.onStateChange((estado) => {
+        console.log(`📶 Estado sesión boda ${bodaId}: ${estado}`);
+        if (estado === "DISCONNECTED") {
+          estadosSesion.set(bodaId, "DISCONNECTED");
+        } else if (estado === "CONNECTED") {
+          estadosSesion.set(bodaId, "CONNECTED");
+        }
+      });
     }
-  );
 
-  console.log(`✅ Venom Bot iniciado para la boda ${bodaId}.`);
-  return sesionesWhatsApp[bodaId];
-};
-
-// 🔹 Obtener el teléfono del `novio` o `novia` de la boda
-const obtenerTelefonoDeBoda = async (bodaId) => {
-  try {
-    const boda = await Boda.findById(bodaId).populate("novios");
-    if (!boda || !boda.novios.length) {
-      throw new Error("❌ No se encontró un `novio` o `novia` para esta boda.");
+    if (typeof client.onClose === "function") {
+      client.onClose(() => {
+        console.log(`🔴 Sesión cerrada para boda ${bodaId}`);
+        sesionesWhatsApp.delete(bodaId);
+        estadosSesion.set(bodaId, "DISCONNECTED");
+      });
     }
 
-    // 📌 Selecciona el primer `novio` o `novia` con número de WhatsApp
-    const usuarioWhatsApp = boda.novios.find((novio) => novio.telefono);
-    if (!usuarioWhatsApp) {
-      throw new Error(
-        "❌ Ningún `novio` o `novia` tiene un número de WhatsApp registrado."
-      );
-    }
-
-    return usuarioWhatsApp.telefono;
+    return client;
   } catch (error) {
-    console.error("❌ Error obteniendo teléfono de la boda:", error);
-    return null;
+    console.error(`❌ Error iniciando sesión boda ${bodaId}:`, error);
+    estadosSesion.set(bodaId, "ERROR");
+    throw new Error("No se pudo iniciar la sesión de WhatsApp");
   }
 };
 
-// 🔹 Enviar mensaje desde la sesión de WhatsApp de la boda
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Enviar mensaje a un teléfono
+async function enviarMensaje(telefono, mensaje, bodaId) {
+  const client = await iniciarSesionWhatsApp(bodaId);
+  const numeroConPrefijo = `34${telefono}@c.us`;
 
-const enviarMensaje = async (bodaId, telefonoDestino, mensaje) => {
   try {
-    if (!sesionesWhatsApp[bodaId]) {
-      console.log(
-        `⚠️ Sesión de WhatsApp no encontrada para la boda ${bodaId}. Iniciando...`
-      );
-      await iniciarSesionWhatsApp(bodaId);
-    }
-
-    console.log(
-      `📨 Enviando mensaje a ${telefonoDestino} desde la boda ${bodaId}...`
-    );
-
-    await delay(2000); // ⏳ Esperar 2 segundos antes de enviar cada mensaje
-
-    await sesionesWhatsApp[bodaId].sendText(`${telefonoDestino}@c.us`, mensaje);
-    console.log(`✅ Mensaje enviado a ${telefonoDestino}`);
-
-    return { success: true, message: `Mensaje enviado a ${telefonoDestino}` };
+    const enviado = await client.sendText(numeroConPrefijo, mensaje);
+    console.log(`✅ Mensaje enviado a ${telefono}`);
+    return enviado;
   } catch (error) {
-    console.error(`❌ Error enviando mensaje a ${telefonoDestino}:`, error);
-    return { success: false, error: error.message };
+    console.error(`❌ Error al enviar mensaje a ${telefono}:`, error);
+    throw new Error("No se pudo enviar el mensaje");
   }
-};
-// 🔹 Cambiar el número de WhatsApp de la boda
-const cambiarNumeroWhatsApp = async (bodaId, nuevoNumero) => {
-  await cerrarWhatsApp(bodaId);
-  await Boda.findByIdAndUpdate(bodaId, {
-    whatsappNumber: nuevoNumero,
-    whatsappSession: null,
-  });
-  console.log(
-    `🔄 Número de WhatsApp cambiado a ${nuevoNumero} para la boda ${bodaId}.`
-  );
-  return { success: true, message: "Número de WhatsApp actualizado." };
-};
-
-// 🔹 Enviar mensaje a una lista de difusión desde la sesión de la boda
-const enviarMensajeBroadcast = async (bodaId, nombreLista, mensaje) => {
-  try {
-    if (!sesionesWhatsApp[bodaId]) {
-      console.log(
-        `⚠️ Sesión de la boda ${bodaId} no encontrada. Iniciando sesión...`
-      );
-      await iniciarSesionWhatsApp(bodaId);
-    }
-
-    console.log(`🔍 Buscando la lista de difusión '${nombreLista}'...`);
-    const listaDB = await BroadcastList.findOne({ nombre: nombreLista }).exec();
-    if (!listaDB) {
-      throw new Error(`❌ Lista de difusión '${nombreLista}' no encontrada.`);
-    }
-
-    const telefonos = listaDB.invitados.map((inv) => inv.telefono);
-    console.log(`📦 Enviando mensaje a la lista '${nombreLista}':`, telefonos);
-
-    for (const telefonoDestino of telefonos) {
-      try {
-        await sesionesWhatsApp[bodaId].sendText(
-          `${telefonoDestino}@c.us`,
-          mensaje
-        );
-        console.log(`✅ Mensaje enviado a ${telefonoDestino}`);
-        await new Promise((resolve) => setTimeout(resolve, 2000)); // Pausa de 1 segundo entre envíos
-      } catch (error) {
-        console.error(
-          `❌ Error enviando mensaje a ${telefonoDestino}:`,
-          error.message
-        );
-      }
-    }
-
-    return {
-      success: true,
-      message: `Mensaje enviado a la lista '${nombreLista}'.`,
-    };
-  } catch (error) {
-    console.error(
-      `❌ Error enviando mensaje a la lista '${nombreLista}':`,
-      error
-    );
-    return { success: false, error: error.message };
-  }
-};
-
-// 🔹 Cerrar sesión en WhatsApp de una boda
-const cerrarWhatsApp = async (bodaId) => {
-  if (sesionesWhatsApp[bodaId]) {
-    await sesionesWhatsApp[bodaId].close();
-    console.log(`🛑 Venom Bot cerrado para la boda ${bodaId}.`);
-    delete sesionesWhatsApp[bodaId];
-  } else {
-    console.log(`⚠️ No hay sesión activa para la boda ${bodaId}.`);
-  }
-};
-
-// 🔹 Obtener estado de la sesión de la boda
-const estadoWhatsApp = (bodaId) => {
-  return sesionesWhatsApp[bodaId] ? "Sesión activa" : "Sesión no iniciada";
-};
-
-/* // 🔹 Monitorear y reiniciar sesiones automáticamente
-const monitorearSesionesWhatsApp = async () => {
-  console.log("🔍 Monitoreando sesiones de WhatsApp activas...");
-  const bodasConSesion = await Boda.find({ whatsappSession: { $ne: null } });
-
-  for (const boda of bodasConSesion) {
-    const estado = await sesionesWhatsApp[boda._id]?.isConnected();
-    if (!estado) {
-      console.log(`⚠️ Sesión de la boda ${boda._id} desconectada. Reiniciando...`);
-      await iniciarSesionWhatsApp(boda._id);
-    }
-  }
-}; */
+}
 
 module.exports = {
   iniciarSesionWhatsApp,
-  cambiarNumeroWhatsApp,
-  obtenerTelefonoDeBoda,
-  cerrarWhatsApp,
-  estadoWhatsApp,
   enviarMensaje,
-  enviarMensajeBroadcast,
 };

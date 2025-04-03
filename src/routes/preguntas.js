@@ -19,14 +19,15 @@ router.get(
 
 // 📌 Eliminar pregunta
 router.delete(
-  "/preguntas/:id",
+  "/:id",
   authMiddleware(["novio", "novia", "admin"]),
   preguntaController.eliminarPregunta
 );
 
+// Solo novios, admin o novia pueden editar
 router.put(
-  "/preguntas/:id",
-  authMiddleware(["novio", "novia", "admin"]),
+  "/:id",
+  authMiddleware(["admin", "novio", "novia"]),
   preguntaController.editarPregunta
 );
 

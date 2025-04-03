@@ -1,127 +1,194 @@
 const {
-  iniciarWhatsApp,
-  cerrarWhatsApp,
-  estadoWhatsApp,
+  iniciarSesionWhatsApp,
   enviarMensaje,
-  enviarMensajeBroadcast,
 } = require("../services/whatsappService");
+const BroadcastList = require("../models/BroadcastList");
+const Guest = require("../models/Guest");
 
-// Iniciar la sesión de WhatsApp
+// Iniciar sesión desde backend (uso interno o admin)
 const startSession = async (req, res) => {
+  const { bodaId } = req.body;
+
   try {
-    await iniciarWhatsApp();
-    res.json({
-      success: true,
-      message: "Sesión de WhatsApp iniciada correctamente.",
-    });
+    const client = await iniciarSesionWhatsApp(bodaId);
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Sesión iniciada",
+        clientInfo: !!client,
+      });
   } catch (error) {
-    console.error("❌ Error al iniciar sesión de WhatsApp:", error);
-    res.status(500).json({
-      success: false,
-      error: "Error al iniciar la sesión de WhatsApp.",
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error iniciando sesión",
+        error: error.message,
+      });
   }
 };
 
-// Cerrar la sesión de WhatsApp
+// Iniciar sesión desde frontend (por botón)
+const startSessionFromFrontend = async (req, res) => {
+  const { bodaId } = req.body;
+
+  try {
+    const client = await iniciarSesionWhatsApp(bodaId);
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Sesión iniciada correctamente desde el frontend",
+      });
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "No se pudo iniciar la sesión",
+        error: error.message,
+      });
+  }
+};
+
+// Cerrar sesión manualmente
 const closeSession = async (req, res) => {
+  const { bodaId } = req.body;
+
   try {
-    await cerrarWhatsApp();
-    res.json({
-      success: true,
-      message: "Sesión de WhatsApp cerrada correctamente.",
-    });
+    // Aquí podrías implementar una función específica si quieres cerrar y borrar la sesión
+    res
+      .status(501)
+      .json({ success: false, message: "Cerrar sesión aún no implementado" });
   } catch (error) {
-    console.error("❌ Error al cerrar la sesión de WhatsApp:", error);
-    res.status(500).json({
-      success: false,
-      error: "Error al cerrar la sesión de WhatsApp.",
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error cerrando sesión",
+        error: error.message,
+      });
   }
 };
 
-// Verificar el estado de la sesión de WhatsApp
+// Estado de la sesión (revisar si está activa)
 const getSessionStatus = async (req, res) => {
+  const { bodaId } = req.query;
+
   try {
-    const status = await estadoWhatsApp();
-    res.json({ success: true, status });
+    const client = await iniciarSesionWhatsApp(bodaId); // Esto intenta levantar o usar la sesión
+    const estado = await client.getConnectionState();
+
+    res.status(200).json({ success: true, estado });
   } catch (error) {
-    console.error(
-      "❌ Error al obtener el estado de la sesión de WhatsApp:",
-      error
-    );
-    res.status(500).json({
-      success: false,
-      error: "Error al obtener el estado de la sesión de WhatsApp.",
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error obteniendo estado",
+        error: error.message,
+      });
   }
 };
 
 // Enviar mensaje directo
 const sendMessage = async (req, res) => {
+  const { telefono, mensaje, bodaId } = req.body;
+
   try {
-    const { telefono, mensaje } = req.body;
-    const response = await enviarMensaje(telefono, mensaje);
-    res.json(response);
+    const enviado = await enviarMensaje(telefono, mensaje, bodaId);
+    res.status(200).json({ success: true, enviado });
   } catch (error) {
-    console.error("❌ Error al enviar mensaje:", error);
-    res.status(500).json({
-      success: false,
-      error: "Error al enviar el mensaje.",
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error enviando mensaje",
+        error: error.message,
+      });
   }
 };
 
-// Enviar mensaje a lista de difusión
+// Enviar mensaje por lista de difusión
 const sendBroadcastMessage = async (req, res) => {
-  try {
-    const { nombreLista, mensaje } = req.body;
-    console.log("📨 Datos recibidos en la solicitud:");
-    console.log("Nombre de la Lista:", nombreLista);
-    console.log("Mensaje:", mensaje);
-    console.log("📦 req.body completo:", req.body);
+  const { listaId, mensaje, bodaId } = req.body;
 
-    if (
-      !nombreLista ||
-      typeof nombreLista !== "string" ||
-      nombreLista.trim() === ""
-    ) {
-      console.error("❌ El nombre de la lista de difusión no es válido.");
-      return res.status(400).json({
-        success: false,
-        error:
-          "El nombre de la lista de difusión es requerido y debe ser un texto válido.",
-      });
+  try {
+    const lista = await BroadcastList.findById(listaId).populate("invitados");
+
+    if (!lista) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Lista no encontrada" });
     }
 
-    const response = await enviarMensajeBroadcast(nombreLista, mensaje);
-    res.json(response);
+    const resultados = [];
+    for (const invitado of lista.invitados) {
+      if (invitado.telefono) {
+        try {
+          const r = await enviarMensaje(invitado.telefono, mensaje, bodaId);
+          resultados.push({
+            invitado: invitado._id,
+            status: "enviado",
+            resultado: r,
+          });
+        } catch (err) {
+          resultados.push({
+            invitado: invitado._id,
+            status: "fallo",
+            error: err.message,
+          });
+        }
+      }
+    }
+
+    res.status(200).json({ success: true, resultados });
   } catch (error) {
-    console.error("❌ Error al enviar mensaje a la lista de difusión:", error);
-    res.status(500).json({
-      success: false,
-      error: "Error al enviar el mensaje a la lista de difusión.",
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error en envío a lista",
+        error: error.message,
+      });
   }
 };
 
-// 🔹 Programar un mensaje
+// Programar mensaje (puede ir a una lista o grupo de invitados)
 const scheduleMessage = async (req, res) => {
+  const { invitados = [], mensaje, fechaEnvio, bodaId } = req.body;
+
   try {
-    const { telefono, mensaje, fechaEnvio } = req.body;
-    const response = await programarMensaje(telefono, mensaje, fechaEnvio);
-    res.json(response);
+    // Aquí solo simulamos programación. En producción deberías guardar esto en BD y usar un scheduler (como cron, agenda, etc.)
+    console.log(
+      `📅 Mensaje programado para ${fechaEnvio}: "${mensaje}" a ${invitados.length} invitados`
+    );
+
+    // Aquí podrías guardar la tarea en una colección de mensajes programados
+
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: "Mensaje programado",
+        invitados,
+        fechaEnvio,
+      });
   } catch (error) {
-    console.error("❌ Error al programar mensaje:", error);
-    res.status(500).json({
-      success: false,
-      error: "Error al programar el mensaje.",
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error programando mensaje",
+        error: error.message,
+      });
   }
 };
 
 module.exports = {
   startSession,
+  startSessionFromFrontend,
   closeSession,
   getSessionStatus,
   sendMessage,

@@ -8,7 +8,8 @@ const respuestaSchema = new mongoose.Schema({
     required: true,
   },
   pregunta: { type: String, required: true },
-  respuesta: { type: String, required: true },
+  respuesta: { type: String, default: "" },
+  subRespuesta: { type: String },
   fecha: { type: Date, default: Date.now },
 });
 

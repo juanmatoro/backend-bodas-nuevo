@@ -10,6 +10,8 @@ const {
   cargarInvitadosDesdeExcel,
   asignarPreguntaAInvitados,
   filtrarInvitadosPorRespuesta,
+  obtenerPreguntasAsignadas,
+  guardarRespuestas,
 } = require("../controllers/guestController");
 const authMiddleware = require("../middlewares/authMiddleware");
 
@@ -60,6 +62,18 @@ router.post(
   "/filtrar-por-respuesta",
   authMiddleware(["admin", "novio", "novia"]),
   filtrarInvitadosPorRespuesta
+);
+
+router.get(
+  "/:id/preguntas-asignadas",
+  authMiddleware(["guest", "admin", "novio", "novia"]),
+  obtenerPreguntasAsignadas
+);
+
+router.post(
+  "/:id/responder",
+  authMiddleware(["guest", "admin", "novio", "novia"]),
+  guardarRespuestas
 );
 
 module.exports = router;

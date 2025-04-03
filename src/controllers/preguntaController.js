@@ -1,7 +1,7 @@
 const Question = require("../models/Question");
 const Guest = require("../models/Guest");
 
-// 📌 Crear nueva pregunta y asignarla a invitados que cumplan el filtro
+// 📌 Crear nueva pregunta (con posible subpregunta condicional)
 const crearPregunta = async (req, res) => {
   try {
     const {
@@ -10,7 +10,7 @@ const crearPregunta = async (req, res) => {
       opciones,
       esObligatoria = false,
       esConfirmacionAsistencia = false,
-      filtros = {},
+      subPregunta = null,
     } = req.body;
 
     if (
@@ -30,20 +30,15 @@ const crearPregunta = async (req, res) => {
       opciones,
       esObligatoria,
       esConfirmacionAsistencia,
-      filtros,
+      subPregunta, // ✅ Se guarda como parte del modelo
     });
 
     await nuevaPregunta.save();
 
-    // 🔎 Filtrar invitados que cumplan los filtros (o todos si no hay filtros)
-    const filtroInvitados = { bodaId, ...filtros };
-
-    const invitados = await Guest.find(filtroInvitados);
-
-    // No se guarda la relación en la pregunta, pero podrías notificar por WhatsApp aquí
+    // Opcional: aquí podrías notificar por WhatsApp a los invitados
 
     res.status(201).json({
-      message: `Pregunta creada y asignada a ${invitados.length} invitado(s).`,
+      message: "Pregunta creada correctamente.",
       question: nuevaPregunta,
     });
   } catch (error) {
@@ -80,26 +75,56 @@ const eliminarPregunta = async (req, res) => {
 };
 
 //📌 Editar preguntas
+// 📌 Actualizar pregunta (incluye subpregunta)
 const editarPregunta = async (req, res) => {
   try {
     const { id } = req.params;
-    const { texto, opciones, esObligatoria, esConfirmacionAsistencia } =
-      req.body;
+    const {
+      pregunta,
+      opciones,
+      esObligatoria,
+      esConfirmacionAsistencia,
+      subPregunta,
+    } = req.body;
 
-    const pregunta = await Pregunta.findByIdAndUpdate(
+    // Validación mínima
+    if (!pregunta || !Array.isArray(opciones) || opciones.length < 2) {
+      return res
+        .status(400)
+        .json({ message: "Datos incompletos o inválidos." });
+    }
+
+    // Validar subpregunta si está presente
+    if (
+      subPregunta &&
+      (!subPregunta.pregunta || !Array.isArray(subPregunta.opciones))
+    ) {
+      return res.status(400).json({ message: "Subpregunta inválida." });
+    }
+
+    const preguntaActualizada = await Question.findByIdAndUpdate(
       id,
-      { texto, opciones, esObligatoria, esConfirmacionAsistencia },
+      {
+        pregunta,
+        opciones,
+        esObligatoria,
+        esConfirmacionAsistencia,
+        subPregunta: subPregunta || null, // Si no se envía, se borra
+      },
       { new: true }
     );
 
-    if (!pregunta) {
-      return res.status(404).json({ message: "Pregunta no encontrada" });
+    if (!preguntaActualizada) {
+      return res.status(404).json({ message: "Pregunta no encontrada." });
     }
 
-    res.json(pregunta);
+    res.json({
+      message: "Pregunta actualizada correctamente.",
+      question: preguntaActualizada,
+    });
   } catch (error) {
-    console.error("Error al editar la pregunta:", error);
-    res.status(500).json({ message: "Error del servidor" });
+    console.error("❌ Error al actualizar pregunta:", error);
+    res.status(500).json({ message: "Error en el servidor" });
   }
 };
 
