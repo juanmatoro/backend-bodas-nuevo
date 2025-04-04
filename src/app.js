@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const errorMiddleware = require("./middlewares/errorMiddleware");
+const baileysRoutes = require("./routes/baileysRoutes");
 
 // Rutas
 const authRoutes = require("./routes/authRoutes");
@@ -34,6 +35,7 @@ app.use("/api/guests", guestRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/lists", broadcastRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/baileys", baileysRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
 app.use("/api/plantillas", messageTemplateRoutes);
 app.use("/api/preguntas", preguntaRoutes);

@@ -91,4 +91,6 @@ async function enviarMensaje(telefono, mensaje, bodaId) {
 module.exports = {
   iniciarSesionWhatsApp,
   enviarMensaje,
+  sesionesWhatsApp,
+  estadosSesion,
 };

@@ -460,3 +460,14 @@ exports.filtrarInvitadosPorRespuesta = async (req, res) => {
       .json({ message: "Error al filtrar invitados por respuesta." });
   }
 };
+
+exports.getAllGuestsByBoda = async (req, res) => {
+  const { bodaId } = req.params;
+  try {
+    const invitados = await Guest.find({ bodaId });
+    res.status(200).json({ invitados });
+  } catch (error) {
+    console.error("Error al obtener todos los invitados:", error);
+    res.status(500).json({ mensaje: "Error al obtener los invitados" });
+  }
+};

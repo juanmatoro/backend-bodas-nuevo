@@ -12,6 +12,7 @@ const {
   filtrarInvitadosPorRespuesta,
   obtenerPreguntasAsignadas,
   guardarRespuestas,
+  getAllGuestsByBoda,
 } = require("../controllers/guestController");
 const authMiddleware = require("../middlewares/authMiddleware");
 
@@ -29,6 +30,8 @@ router.get(
   obtenerInvitado
 );
 router.post("/", authMiddleware(["admin", "novio", "novia"]), crearInvitado);
+
+//Editar invitado
 router.patch(
   "/:id",
   authMiddleware(["admin", "novio", "novia", "guest"]),
@@ -74,6 +77,12 @@ router.post(
   "/:id/responder",
   authMiddleware(["guest", "admin", "novio", "novia"]),
   guardarRespuestas
+);
+
+router.get(
+  "/all-by-boda/:bodaId",
+  authMiddleware(["admin", "novio", "novia"]),
+  getAllGuestsByBoda
 );
 
 module.exports = router;
