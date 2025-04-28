@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const formController = require("../controllers/formController");
-const authMiddleware = require("../middlewares/authMiddleware");
+const authMiddleware = require("../../middlewares/authMiddleware");
 
 // 📌 CRUD de Preguntas (Solo Admin o Novios)
 router.post(
@@ -13,6 +13,11 @@ router.get(
   "/questions/:bodaId",
   authMiddleware(["admin", "novio", "novia"]),
   formController.getQuestionsByBoda
+);
+router.get(
+  "/question/:id",
+  authMiddleware(["admin", "novio", "novia"]),
+  formController.getQuestionById
 );
 router.put(
   "/questions/:id",
@@ -27,10 +32,11 @@ router.delete(
 
 // 📌 CRUD de Formularios (Solo Admin o Novios pueden crearlos)
 router.post(
-  "/forms",
+  "/form",
   authMiddleware(["admin", "novio", "novia"]),
   formController.createForm
 );
+
 router.get(
   "/forms/:bodaId",
   authMiddleware(["admin", "novio", "novia"]),
@@ -42,6 +48,17 @@ router.get(
   formController.getFormById
 );
 
+router.delete(
+  "/form/:id",
+  authMiddleware(["admin", "novio", "novia"]),
+  formController.deleteForm
+);
+
+router.put(
+  "/form/:id",
+  authMiddleware(["admin", "novio", "novia"]),
+  formController.updateForm
+);
 // 📌 Guardar respuesta de un invitado (Solo Invitados)
 router.post(
   "/responses",

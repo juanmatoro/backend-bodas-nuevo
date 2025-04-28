@@ -104,8 +104,20 @@ exports.validarMagicLink = async (req, res) => {
       return res.status(404).json({ message: "Invitado no encontrado" });
     }
 
-    res.json({ message: "Autenticación exitosa", guest });
+    // 📌 Generar nuevo token usable para el frontend
+    const tokenFinal = jwt.sign(
+      { _id: guest._id, role: "guest", bodaId: guest.bodaId },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.json({
+      message: "Invitado autenticado correctamente",
+      guest,
+      token: tokenFinal,
+    });
   } catch (error) {
+    console.error("❌ Error en validarMagicLink:", error);
     res.status(401).json({ message: "Token inválido o expirado" });
   }
 };

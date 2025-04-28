@@ -47,3 +47,65 @@ const authMiddleware = (rolesPermitidos) => {
 };
 
 module.exports = authMiddleware;
+
+/* //modelo de usuario y de invitado
+//middleware de autenticación
+//jwt
+//roles permitidos
+//roles de usuario
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+const Guest = require("../models/Guest");
+
+const authMiddleware =
+  (rolesPermitidos = []) =>
+  async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ message: "Token no proporcionado" });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      if (decoded.role === "guest") {
+        const invitado = await Guest.findById(decoded._id);
+        if (!invitado) {
+          return res.status(404).json({ message: "Invitado no encontrado" });
+        }
+
+        req.user = {
+          _id: invitado._id,
+          role: "guest",
+          bodaId: invitado.bodaId,
+        };
+      } else {
+        const user = await User.findById(decoded._id);
+        if (!user) {
+          return res.status(404).json({ message: "Usuario no encontrado" });
+        }
+
+        req.user = {
+          _id: user._id,
+          role: user.tipoUsuario, // admin | novio | novia
+          bodaId: user.bodaId,
+        };
+      }
+
+      // Verificación del rol permitido
+      if (!rolesPermitidos.includes(req.user.role)) {
+        return res.status(403).json({ message: "Acceso denegado" });
+      }
+
+      next();
+    } catch (error) {
+      console.error("❌ Error en authMiddleware:", error);
+      return res.status(401).json({ message: "Token inválido o expirado" });
+    }
+  };
+
+module.exports = authMiddleware;
+ */
