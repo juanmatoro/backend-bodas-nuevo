@@ -27,6 +27,7 @@ app.use(
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use("/api/whatsapp", whatsappRoutes);  
 
 // Rutas
 app.use("/api/auth", authRoutes);
@@ -37,6 +38,7 @@ app.use("/api/lists", broadcastRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/baileys", baileysRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
+app.use("/api/whatsapp/start", whatsappRoutes);
 app.use("/api/plantillas", messageTemplateRoutes);
 app.use("/api/preguntas", preguntaRoutes);
 app.use("/api/photos", photoRoutes);
