@@ -14,6 +14,20 @@ const messageTemplateSchema = new mongoose.Schema(
       ref: "User", // o "Novio"/"Novia" según el modelo
       required: true,
     },
+    slug: {
+      type: String,
+      required: true,
+      enum: ["primer-contacto"], // por ahora sólo esta plantilla
+      unique: true,
+    },
+    cuerpo: {
+      type: String,
+      required: true,
+    },
+    editable: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );
