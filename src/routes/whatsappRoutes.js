@@ -9,6 +9,7 @@ const {
   sendBroadcastMessage,
   scheduleMessage,
 } = require("../controllers/watssappController");
+const primerContactoController = require("../controllers/primerContactoController");
 
 const router = express.Router();
 
@@ -32,5 +33,8 @@ router.post("/schedule", scheduleMessage);
 
 // Ruta para enviar un mensaje a una lista de difusión
 router.post("/broadcast", sendBroadcastMessage);
+
+// Ruta para enviar un mensaje de primer contacto
+router.post("/primer-contacto", primerContactoController.enviarPrimerContacto);
 
 module.exports = router;
